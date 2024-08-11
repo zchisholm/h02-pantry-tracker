@@ -1,6 +1,5 @@
-'use client'
-import Image from "next/image";
-import { useState, useEffect } from "react";
+"use client";
+import { useState, useEffect, useRef } from "react";
 import { firestore } from "@/firebase";
 import {
   Box,
@@ -9,14 +8,31 @@ import {
   Typography,
   Stack,
   Button,
+  Grid,
+  Paper,
+  InputAdornment,
+  Alert,
 } from "@mui/material";
-import { collection, deleteDoc, getDocs, query, getDoc, setDoc} from "firebase/firestore";
-import { ST } from "next/dist/shared/lib/utils";
+import SearchIcon from "@mui/icons-material/Search";
+import {
+  collection,
+  deleteDoc,
+  getDocs,
+  query,
+  getDoc,
+  setDoc,
+  doc,
+} from "firebase/firestore";
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
+  const [filteredInventory, setFilteredInventory] = useState([]);
   const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const inventoryRef = useRef(null);
+  const itemRefs = useRef({});
 
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, "inventory"));
@@ -29,11 +45,12 @@ export default function Home() {
       });
     });
     setInventory(inventoryList);
+    setFilteredInventory(inventoryList);
   };
 
   const removeItem = async (item) => {
     const docRef = doc(collection(firestore, "inventory"), item);
-    const docSnap = await getDoc(doref);
+    const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const { quantity } = docSnap.data();
@@ -49,7 +66,7 @@ export default function Home() {
 
   const addItem = async (item) => {
     const docRef = doc(collection(firestore, "inventory"), item);
-    const docSnap = await getDoc(doref);
+    const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const { quantity } = docSnap.data();
@@ -64,8 +81,49 @@ export default function Home() {
     updateInventory();
   }, []);
 
+  useEffect(() => {
+    const filtered = inventory.filter((item) =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredInventory(filtered);
+    setNotFound(searchTerm !== "" && filtered.length === 0);
+
+    if (filtered.length > 0 && searchTerm !== "") {
+      const firstMatch = filtered[0].name;
+      setTimeout(() => {
+        if (itemRefs.current[firstMatch]) {
+          itemRefs.current[firstMatch].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100);
+    }
+  }, [searchTerm, inventory]);
+
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+
+  const highlightText = (text, highlight) => {
+    if (!highlight.trim()) {
+      return <span>{text}</span>;
+    }
+    const regex = new RegExp(`(${highlight})`, "gi");
+    const parts = text.split(regex);
+    return (
+      <span>
+        {parts.filter(String).map((part, i) => {
+          return regex.test(part) ? (
+            <span key={i} style={{ backgroundColor: "yellow" }}>
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          );
+        })}
+      </span>
+    );
+  };
 
   return (
     <Box
@@ -90,7 +148,7 @@ export default function Home() {
           flexDirection="column"
           gap={3}
           sx={{
-            transform: 'translate(-50%,-50%")',
+            transform: "translate(-50%, -50%)",
           }}
         >
           <Typography variant="h6">Add Item</Typography>
@@ -102,7 +160,7 @@ export default function Home() {
               onChange={(e) => setItemName(e.target.value)}
             />
             <Button
-              variant="outlined"
+              variant="contained"
               onClick={() => {
                 addItem(itemName);
                 setItemName("");
@@ -114,68 +172,93 @@ export default function Home() {
           </Stack>
         </Box>
       </Modal>
-      <Button
-        variant="contained"
-        onClick={() => {
-          handleOpen();
-        }}
-      >
-        Add Item
-      </Button>
-      <Box border="1px solid #333">
+
+      <Paper elevation={3} sx={{ width: "800px", overflow: "hidden" }}>
         <Box
-          width="800px"
-          height="100px"
           bgcolor="#ADD8E6"
           display="flex"
           alignItems="center"
-          justifyContent="center"
+          justifyContent="space-between"
+          p={2}
         >
-          <Typography variant="h2" color="#333">
+          <Typography variant="h4" color="#333">
             Inventory Items
           </Typography>
+          <Button variant="contained" onClick={handleOpen}>
+            Add Item
+          </Button>
         </Box>
 
-        <Stack widdth="100%" height="300px" spacing={2} overflow="auto">
-          {inventory.map(({ name, quantity }) => (
-            <Box
+        <Box sx={{ p: 2 }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search items..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+
+        {notFound && (
+          <Alert severity="info" sx={{ mx: 2 }}>
+            No items found matching "{searchTerm}"
+          </Alert>
+        )}
+
+        <Box sx={{ maxHeight: "400px", overflow: "auto" }} ref={inventoryRef}>
+          {filteredInventory.map(({ name, quantity }) => (
+            <Paper
               key={name}
-              width="100%"
-              minHeight="150px"
-              display="flex"
-              alighItems="center"
-              justifyContent="space-between"
-              bgcolor="#F0F0F0"
-              padding={5}
+              elevation={1}
+              sx={{ m: 2, p: 2 }}
+              ref={(el) => (itemRefs.current[name] = el)}
             >
-              <Typography variant="h3" color="#333" textAlign="center">
-                {name.charAt(0).toUpperCase() + name.slice(1)}
-              </Typography>
-              <Typography variant="h3" color="#333" textAlign="center">
-                {quantity}
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <Button
-                  varitant="contained"
-                  onClick={() => {
-                    addItem(name);
-                  }}
-                >
-                  Add
-                </Button>
-                <Button
-                  varitant="contained"
-                  onClick={() => {
-                    removeItem(name);
-                  }}
-                >
-                  Remove
-                </Button>
-              </Stack>
-            </Box>
+              <Grid container alignItems="center" spacing={2}>
+                <Grid item xs={5}>
+                  <Typography variant="h6" color="#333">
+                    {highlightText(
+                      name.charAt(0).toUpperCase() + name.slice(1),
+                      searchTerm
+                    )}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="h6" color="#333" textAlign="center">
+                    {quantity}
+                  </Typography>
+                </Grid>
+                <Grid item xs={5}>
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={() => addItem(name)}
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      size="small"
+                      onClick={() => removeItem(name)}
+                    >
+                      Remove
+                    </Button>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </Paper>
           ))}
-        </Stack>
-      </Box>
+        </Box>
+      </Paper>
     </Box>
   );
 }
