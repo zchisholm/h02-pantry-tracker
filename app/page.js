@@ -1,4 +1,4 @@
-"use client";
+'use client'
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { firestore } from "@/firebase";
@@ -10,11 +10,12 @@ import {
   Stack,
   Button,
 } from "@mui/material";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, deleteDoc, getDocs, query, getDoc, setDoc} from "firebase/firestore";
+import { ST } from "next/dist/shared/lib/utils";
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState("");
 
   const updateInventory = async () => {
@@ -71,6 +72,7 @@ export default function Home() {
       width="100vw"
       height="100vh"
       display="flex"
+      flexDirection="column"
       justifyContent="center"
       alignItems="center"
     >
@@ -112,16 +114,68 @@ export default function Home() {
           </Stack>
         </Box>
       </Modal>
-      <Typography variant="h1">Inventory Management</Typography>
-      {inventory.forEach((item) => {
-        console.log(item);
-        return (
-          <>
-            {item.name}
-            {item.quantity}
-          </>
-        );
-      })}
+      <Button
+        variant="contained"
+        onClick={() => {
+          handleOpen();
+        }}
+      >
+        Add Item
+      </Button>
+      <Box border="1px solid #333">
+        <Box
+          width="800px"
+          height="100px"
+          bgcolor="#ADD8E6"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Typography variant="h2" color="#333">
+            Inventory Items
+          </Typography>
+        </Box>
+
+        <Stack widdth="100%" height="300px" spacing={2} overflow="auto">
+          {inventory.map(({ name, quantity }) => (
+            <Box
+              key={name}
+              width="100%"
+              minHeight="150px"
+              display="flex"
+              alighItems="center"
+              justifyContent="space-between"
+              bgcolor="#F0F0F0"
+              padding={5}
+            >
+              <Typography variant="h3" color="#333" textAlign="center">
+                {name.charAt(0).toUpperCase() + name.slice(1)}
+              </Typography>
+              <Typography variant="h3" color="#333" textAlign="center">
+                {quantity}
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  varitant="contained"
+                  onClick={() => {
+                    addItem(name);
+                  }}
+                >
+                  Add
+                </Button>
+                <Button
+                  varitant="contained"
+                  onClick={() => {
+                    removeItem(name);
+                  }}
+                >
+                  Remove
+                </Button>
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      </Box>
     </Box>
   );
 }
